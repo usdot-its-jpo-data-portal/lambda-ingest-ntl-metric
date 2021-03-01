@@ -1,6 +1,8 @@
 import boto3
+import json
 import os
 import requests
+import traceback
 
 from datahub_metrics_ingest.DHMetric import DHMetric
 from datahub_metrics_ingest.FormatterFactory import FormatterFactory
@@ -20,7 +22,9 @@ def lambda_handler(event, context):
             infile = get_data_stream(bucket, key)
             ingest(infile)
     except Exception as e:
-        print(f"Error ingesting NTL metric file {s3fps} ==> {str(e)}")
+        print("Error ingesting NTL metric file")
+        print(event)
+        print(traceback.format_exc())
         raise
 
 def parse_event(event):
