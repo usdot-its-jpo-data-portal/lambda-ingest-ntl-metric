@@ -13,18 +13,28 @@ ELASTICSEARCH_API_BASE_URL = os.environ.get('ELASTICSEARCH_API_BASE_URL')\
 
 
 def lambda_handler(event, context):
-    # S3 file upload triggered lambda
+    # can be triggered by S3 file creation directly and indirectly via SNS
     try:
-        s3fps = {
-            (e['s3']['bucket']['name'], e['s3']['object']['key'])
-            for e in event['Records']
-        }
+        s3fps = parse_event(event)
         for bucket, key in s3fps:
             infile = get_data_stream(bucket, key)
             ingest(infile)
     except Exception as e:
         print(f"Error ingesting NTL metric file {s3fps} ==> {str(e)}")
         raise
+
+def parse_event(event):
+    parse_s3_event_record = lambda x: (x['s3']['bucket']['name'], x['s3']['object']['key'])
+    out = []
+    for event_record in event['Records']:
+        event_source = event_record.get('eventSource') or event_record.get('EventSource')
+        if event_source == 'aws:s3':
+            out.append(parse_s3_event_record(event_record)) 
+        elif event_source == 'aws:sns':
+            s3_event = json.loads(event_record['Sns']['Message'])
+            for s3_event_record in s3_event['Records']:
+                out.append(parse_s3_event_record(s3_event_record)) 
+    return set(out)
 
 def get_data_stream(bucket: str, key: str):
     client = boto3.client('s3')
